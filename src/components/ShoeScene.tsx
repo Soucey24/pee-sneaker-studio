@@ -46,7 +46,6 @@ export default function ShoeScene() {
           global
           polar={[-0.3, 0.3]}
           azimuth={[-0.7, 0.7]}
-          config={{ mass: 1, tension: 180 }}
           snap
         >
           <Shoe />
