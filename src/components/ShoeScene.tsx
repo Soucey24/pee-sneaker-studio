@@ -22,7 +22,7 @@ function Shoe() {
   });
 
   return (
-    <group ref={group} scale={9} rotation={[0.15, 0, 0.05]}>
+    <group ref={group} scale={7.5} rotation={[0.15, 0, 0.05]}>
       <primitive object={scene} />
     </group>
   );
@@ -69,7 +69,7 @@ export default function ShoeScene() {
       <ContactShadows
         position={[0, -1.35, 0]}
         opacity={0.55}
-        scale={9}
+        scale={7.5}
         blur={2.6}
         far={3}
       />
