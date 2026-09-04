@@ -1,6 +1,8 @@
 import { Reveal } from "@/components/Reveal";
+import { useState } from "react";
 
 export function SiteFooter() {
+  const [subscribed, setSubscribed] = useState(false);
   return (
     <footer id="contact" className="mx-auto max-w-6xl px-5 py-16">
       <Reveal>
@@ -9,8 +11,8 @@ export function SiteFooter() {
           <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
             One email a month, only when new heat lands.
           </p>
-          <form
-            onSubmit={(e) => e.preventDefault()}
+            <form
+            onSubmit={(e) => { e.preventDefault(); setSubscribed(true); }}
             className="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row"
           >
             <input
@@ -19,8 +21,8 @@ export function SiteFooter() {
               placeholder="you@email.com"
               className="flex-1 rounded-md border border-border bg-background px-4 py-3 text-sm outline-none transition-colors focus:border-primary"
             />
-            <button className="ember-fill rounded-md px-6 py-3 font-display text-xs tracking-widest transition-transform duration-300 hover:scale-105">
-              Notify me
+              <button disabled={subscribed} className="ember-fill rounded-md px-6 py-3 font-display text-xs tracking-widest transition-transform duration-300 hover:scale-105 disabled:opacity-60">
+              {subscribed ? "You're on the list" : "Notify me"}
             </button>
           </form>
         </div>

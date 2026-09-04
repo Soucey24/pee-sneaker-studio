@@ -1,0 +1,31 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { Package, Plus, Search } from "lucide-react";
+import { useState } from "react";
+import { AdminGuard } from "@/components/AdminGuard";
+import { AddProductModal } from "@/components/AddProductModal";
+import type { Product } from "@/data/products";
+import { useAuth } from "@/context/auth";
+import { useCatalog, type CatalogProduct } from "@/context/catalog";
+
+const categories: Array<"All" | Product["category"]> = ["All", "Shoes", "Sneakers", "Slippers"];
+
+export const Route = createFileRoute("/admin/")({ component: InventoryPage });
+
+function InventoryPage() {
+  const { isAdmin } = useAuth();
+  const { products: inventory, addProduct, updateProduct, removeProduct } = useCatalog();
+  const [category, setCategory] = useState<(typeof categories)[number]>("All");
+  const [status, setStatus] = useState("All");
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  if (!isAdmin) return <AdminGuard />;
+  const visible = inventory.filter((product) => {
+    const text = `${product.name} ${product.tag} ${product.category}`.toLowerCase();
+    return (category === "All" || product.category === category) && (status === "All" || product.status === status || (status === "Out of stock" && product.stock === 0)) && text.includes(search.toLowerCase());
+  });
+  const editSizes = (product: CatalogProduct) => {
+    const value = window.prompt("Enter EU sizes separated by commas", product.sizes.join(", "));
+    if (value) updateProduct(product.id, { sizes: value.split(",").map((item) => Number(item.trim())).filter(Boolean) });
+  };
+  return <div className="mx-auto max-w-7xl px-5 pb-20 pt-8"><div className="flex flex-col justify-between gap-5 border-b border-border pb-8 sm:flex-row sm:items-end"><div><p className="text-xs uppercase tracking-[0.25em] text-primary">Big Pee Kicks / Admin</p><h1 className="mt-3 text-5xl leading-none sm:text-6xl">Inventory</h1><p className="mt-4 text-muted-foreground">Manage products, variants, stock, and publishing status.</p></div><button onClick={() => setOpen(true)} className="ember-fill inline-flex items-center justify-center gap-2 rounded-md px-5 py-3 font-display text-xs tracking-widest"><Plus className="size-4" /> Add product</button></div><div className="mt-8 grid gap-4 sm:grid-cols-3"><div className="border border-border bg-surface p-5"><p className="text-sm text-muted-foreground">Products</p><p className="mt-2 font-display text-3xl text-primary">{inventory.length}</p></div><div className="border border-border bg-surface p-5"><p className="text-sm text-muted-foreground">Active</p><p className="mt-2 font-display text-3xl text-primary">{inventory.filter((product) => product.status === "Active").length}</p></div><div className="border border-border bg-surface p-5"><p className="text-sm text-muted-foreground">Low stock</p><p className="mt-2 font-display text-3xl text-primary">{inventory.filter((product) => product.stock < 5).length}</p></div></div><div className="mt-8 flex flex-col gap-3 border-y border-border py-5 sm:flex-row"><label className="flex flex-1 items-center gap-2 border border-border bg-surface px-3 py-2"><Search className="size-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label><select value={category} onChange={(event) => setCategory(event.target.value as typeof category)} className="border border-border bg-surface px-3 py-2 text-sm"><option>All</option><option>Shoes</option><option>Sneakers</option><option>Slippers</option></select><select value={status} onChange={(event) => setStatus(event.target.value)} className="border border-border bg-surface px-3 py-2 text-sm"><option>All</option><option>Active</option><option>Draft</option><option>Archived</option><option>Out of stock</option></select></div><div className="mt-6 space-y-3">{visible.map((product) => <article key={product.id} className="flex flex-col gap-4 border border-border bg-surface p-4 sm:flex-row sm:items-center"><img src={product.image} alt={product.name} className="size-20 rounded-md object-cover" /><div className="min-w-0 flex-1"><p className="font-display">{product.name}</p><p className="mt-1 text-sm text-muted-foreground">{product.category} · {product.tag} · ${product.price}</p><p className="mt-1 text-xs text-muted-foreground">Sizes: {product.sizes.join(", ")}</p></div><div className="flex flex-wrap items-center gap-2"><input type="number" min="0" value={product.stock} onChange={(event) => updateProduct(product.id, { stock: Math.max(0, Number(event.target.value)) })} className="w-20 rounded border border-border bg-background px-2 py-2 text-sm" aria-label={`Stock for ${product.name}`} /><select value={product.status} onChange={(event) => updateProduct(product.id, { status: event.target.value as CatalogProduct["status"] })} className="rounded border border-border bg-background px-2 py-2 text-sm"><option>Active</option><option>Draft</option><option>Archived</option></select><button onClick={() => editSizes(product)} className="rounded border border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary hover:text-primary">Sizes</button><button onClick={() => { if (window.confirm(`Delete ${product.name}?`)) removeProduct(product.id); }} className="rounded border border-border px-3 py-2 text-xs text-red-400 hover:border-red-400">Delete</button></div><Package className="hidden size-4 text-primary sm:block" /></article>)}</div>{!visible.length && <p className="py-12 text-center text-muted-foreground">No products match these filters.</p>}<AddProductModal open={open} onClose={() => setOpen(false)} onAdd={addProduct} /></div>;
+}

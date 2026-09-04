@@ -102,6 +102,40 @@
   }
 }
 
+.admin-content .mx-auto {
+  margin-left: 0;
+  margin-right: 0;
+  max-width: none;
+}
+.admin-content,
+.admin-content > div,
+.admin-content > div > main {
+  min-width: 0;
+}
+.admin-content {
+  overflow-x: hidden;
+}
+.admin-content > div > aside,
+.admin-content > div > button {
+  display: none;
+}
+.admin-content > div > main {
+  margin-left: 0;
+  width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .admin-content {
+    padding-top: 4.5rem;
+  }
+
+  .admin-content select,
+  .admin-content input,
+  .admin-content textarea {
+    max-width: 100%;
+  }
+}
+
 @utility ember-text {
   background: var(--gradient-ember);
   -webkit-background-clip: text;

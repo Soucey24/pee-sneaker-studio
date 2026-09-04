@@ -7,10 +7,15 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
+import logo from "../../logo/logo.png";
+import { CartProvider } from "../context/cart";
+import { AuthProvider } from "../context/auth";
+import { CatalogProvider } from "../context/catalog";
+import { WishlistProvider } from "../context/wishlist";
+import { OrdersProvider } from "../context/orders";
 
 function NotFoundComponent() {
   return (
@@ -37,9 +42,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -77,14 +79,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Big Pee Kicks" },
+      { name: "description", content: "Big Pee Kicks sneaker studio." },
+      { name: "author", content: "Big Pee Kicks" },
+      { property: "og:title", content: "Big Pee Kicks" },
+      { property: "og:description", content: "Big Pee Kicks sneaker studio." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -101,7 +102,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Archivo+Black&family=Hind:wght@300;400;500;600;700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: logo, type: "image/png" },
     ],
   }),
   shellComponent: RootShell,
@@ -129,8 +130,17 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AuthProvider>
+        <CatalogProvider>
+          <WishlistProvider>
+            <OrdersProvider>
+              <CartProvider>
+                <Outlet />
+              </CartProvider>
+            </OrdersProvider>
+          </WishlistProvider>
+        </CatalogProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
