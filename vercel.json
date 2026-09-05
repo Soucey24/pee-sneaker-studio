@@ -1,4 +1,5 @@
 {
-  "buildCommand": "pnpm build",
-  "outputDirectory": ".vercel/output"
+  "framework": "vite",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm build"
 }
