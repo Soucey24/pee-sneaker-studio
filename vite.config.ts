@@ -1,12 +1,21 @@
-// TanStack Start/Vite config included by the project runtime — keep the standard setup
-// and avoid custom output overrides that trigger stale Vercel build artifacts.
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 
 export default defineConfig({
-  nitro: {
-    preset: "vercel",
+  plugins: [
+    tanstackStart({
+      server: { entry: "server" },
+    }),
+    react(),
+  ],
+  resolve: {
+    tsconfigPaths: true,
   },
-  tanstackStart: {
-    server: { entry: "server" },
+  ssr: {
+    noExternal: ["@tanstack/react-start"],
+  },
+  build: {
+    sourcemap: false,
   },
 });
