@@ -3,7 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { createProduct, deleteProduct, listActiveProducts, updateProduct } from "./lib/catalog.server";
-import { getLocalDatabase } from "./lib/sqlite.server";
+import { getDatabase } from "./lib/database.server";
 import { adminName, changeAdminPassword, isAdminRequest, loginAdmin, logoutAdmin } from "./lib/admin-auth.server";
 import { initializePaystackPayment, verifyPaystackPayment } from "./lib/paystack.server";
 import { attachPaymentReference, createPendingOrder, listOrders, markOrderPaid, requestOrderReturn, updateOrderStatus, updateReturnStatus } from "./lib/orders.server";
@@ -11,7 +11,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { deflateSync, inflateSync } from "node:zlib";
 import { join, normalize } from "node:path";
-import { listNotifications, markNotificationsRead } from "./lib/notifications.server";
+import { createNotification, getAdminPhone, listNotifications, markNotificationsRead, sendArkeselSms } from "./lib/notifications.server";
 import { storeProductImage } from "./lib/images.server";
 import { getCartId, readCart, replaceCart } from "./lib/cart.server";
 import { currentBuyer, loginBuyer, logoutBuyer, registerBuyer } from "./lib/buyer-auth.server";
@@ -184,7 +184,7 @@ export default {
         }
       }
       if (requestUrl.pathname === "/api/cart" && (request.method === "GET" || request.method === "PUT" || request.method === "DELETE")) {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         const cart = await getCartId(database, request);
         const headers = cart.cookie ? { "set-cookie": cart.cookie } : undefined;
         if (request.method === "GET") return new Response(JSON.stringify(await readCart(database, cart.id)), { headers: { "content-type": "application/json", ...(headers ?? {}) } });
@@ -198,9 +198,9 @@ export default {
       if (requestUrl.pathname === "/api/health" && request.method === "GET") return Response.json({ ok: true, service: "big-pee-kicks" });
       if (requestUrl.pathname === "/api/shipping/quote" && request.method === "POST") {
         const payload = await request.json() as { city?: string; method?: "standard" | "express"; subtotal?: number };
-        const database = getLocalDatabase();
+        const database = getDatabase();
         const location = payload.city?.trim() || "Other";
-        const rates = await database.prepare("SELECT standard, express FROM shipping_rates WHERE location = ? COLLATE NOCASE").bind(location).all<{ standard: number; express: number }>();
+        const rates = await database.prepare("SELECT standard, express FROM shipping_rates WHERE LOWER(location) = LOWER(?)").bind(location).all<{ standard: number; express: number }>();
         const fallback = await database.prepare("SELECT standard, express FROM shipping_rates WHERE location = 'Other'").bind().all<{ standard: number; express: number }>();
         const configuredSettings = await database.prepare("SELECT key, value FROM store_settings WHERE key IN ('standardShipping', 'expressShipping', 'freeDeliveryThreshold')").bind().all<{ key: string; value: string }>();
         const settingsRates = configuredSettings.results.reduce((values, setting) => ({ ...values, [setting.key]: Number(setting.value) }), {} as { standardShipping?: number; expressShipping?: number; freeDeliveryThreshold?: number });
@@ -214,33 +214,33 @@ export default {
       }
       if (requestUrl.pathname === "/api/buyer/register" && request.method === "POST") {
         const payload = await request.json() as { name?: string; email?: string; password?: string };
-        const result = await registerBuyer(getLocalDatabase(), payload.name ?? "", payload.email ?? "", payload.password ?? "");
+        const result = await registerBuyer(getDatabase(), payload.name ?? "", payload.email ?? "", payload.password ?? "");
         if (!result) return Response.json({ error: "Unable to create account" }, { status: 400 });
         return new Response(JSON.stringify(result.buyer), { headers: { "content-type": "application/json", "set-cookie": result.cookie } });
       }
       if (requestUrl.pathname === "/api/buyer/login" && request.method === "POST") {
         const payload = await request.json() as { email?: string; password?: string };
-        const result = await loginBuyer(getLocalDatabase(), payload.email ?? "", payload.password ?? "");
+        const result = await loginBuyer(getDatabase(), payload.email ?? "", payload.password ?? "");
         if (!result) return Response.json({ error: "Email or password is incorrect" }, { status: 401 });
         return new Response(JSON.stringify(result.buyer), { headers: { "content-type": "application/json", "set-cookie": result.cookie } });
       }
-      if (requestUrl.pathname === "/api/buyer/session" && request.method === "GET") return Response.json(await currentBuyer(getLocalDatabase(), request));
+      if (requestUrl.pathname === "/api/buyer/session" && request.method === "GET") return Response.json(await currentBuyer(getDatabase(), request));
       if (requestUrl.pathname === "/api/buyer/logout" && request.method === "POST") {
-        const cookie = await logoutBuyer(getLocalDatabase(), request);
+        const cookie = await logoutBuyer(getDatabase(), request);
         return new Response("{}", { headers: { "content-type": "application/json", ...(cookie ? { "set-cookie": cookie } : {}) } });
       }
       if (requestUrl.pathname === "/api/buyer/orders" && request.method === "GET") {
-        const buyer = await currentBuyer(getLocalDatabase(), request);
+        const buyer = await currentBuyer(getDatabase(), request);
         if (!buyer) return Response.json({ error: "Buyer authentication required" }, { status: 401 });
-        return Response.json(await listOrders(getLocalDatabase(), undefined, buyer.email));
+        return Response.json(await listOrders(getDatabase(), undefined, buyer.email));
       }
       if (requestUrl.pathname === "/api/orders" && request.method === "GET") {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         if (!await isAdminRequest(database, request)) return Response.json({ error: "Admin authentication required" }, { status: 401 });
         return Response.json(await listOrders(database));
       }
       if (requestUrl.pathname.startsWith("/api/orders/") && request.method === "PATCH") {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         if (!await isAdminRequest(database, request)) return Response.json({ error: "Admin authentication required" }, { status: 401 });
         const payload = await request.json() as { status?: string; returnStatus?: string };
         if (payload.returnStatus) {
@@ -251,7 +251,7 @@ export default {
         return Response.json({ updated: true });
       }
       if (requestUrl.pathname.startsWith("/api/orders/") && requestUrl.pathname.endsWith("/return") && request.method === "POST") {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         const buyer = await currentBuyer(database, request);
         const orderId = requestUrl.pathname.split("/").at(-2) ?? "";
         if (!buyer && !await isAdminRequest(database, request)) return Response.json({ error: "Authentication required" }, { status: 401 });
@@ -261,7 +261,7 @@ export default {
       if (requestUrl.pathname.startsWith("/api/orders/") && requestUrl.pathname.endsWith("/receipt") && request.method === "GET") {
         const orderId = requestUrl.pathname.split("/").at(-2) ?? "";
         const reference = requestUrl.searchParams.get("reference");
-        const database = getLocalDatabase();
+        const database = getDatabase();
         const order = await database.prepare("SELECT id, payment_status, payment_reference, delivery_email, delivery_name, delivery_address, delivery_city, delivery_country, subtotal, shipping, total, placed_at FROM orders WHERE id = ?").bind(orderId).all<{ id: string; payment_status: string; payment_reference: string | null; delivery_email: string; delivery_name: string; delivery_address: string; delivery_city: string; delivery_country: string; subtotal: number; shipping: number; total: number; placed_at: string }>();
         if (!order.results[0] || order.results[0].payment_status !== "Paid" || (reference !== order.results[0].payment_reference && !await isAdminRequest(database, request))) return Response.json({ error: "Receipt unavailable" }, { status: 404 });
 
@@ -277,14 +277,14 @@ export default {
         if (attempt && attempt.resetAt > Date.now() && attempt.count >= 5) return Response.json({ error: "Too many login attempts" }, { status: 429 });
       }
       if (requestUrl.pathname === "/api/admin/password" && request.method === "POST") {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         if (!await isAdminRequest(database, request)) return Response.json({ error: "Admin authentication required" }, { status: 401 });
         const payload = await request.json() as { currentPassword?: string; newPassword?: string };
         const changed = await changeAdminPassword(database, request, payload.currentPassword ?? "", payload.newPassword ?? "");
         return changed ? Response.json({ changed: true }) : Response.json({ error: "Password change failed" }, { status: 400 });
       }
       if (new URL(request.url).pathname === "/api/products") {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         if (request.method === "GET") return Response.json(await listActiveProducts(database));
         if (!await isAdminRequest(database, request)) return Response.json({ error: "Admin authentication required" }, { status: 401 });
         const payload = await request.json() as { action?: string; product?: Parameters<typeof createProduct>[1]; id?: string };
@@ -306,7 +306,7 @@ export default {
       }
       if (new URL(request.url).pathname === "/api/admin/login" && request.method === "POST") {
         const payload = await request.json() as { password?: string };
-        const result = await loginAdmin(getLocalDatabase(), payload.password ?? "");
+        const result = await loginAdmin(getDatabase(), payload.password ?? "");
         if (!result) {
           const address = request.headers.get("x-forwarded-for") ?? "unknown";
           const current = loginAttempts.get(address);
@@ -316,48 +316,63 @@ export default {
         return new Response(JSON.stringify({ name: result.name }), { headers: { "content-type": "application/json", "set-cookie": result.cookie } });
       }
       if (new URL(request.url).pathname === "/api/admin/session" && request.method === "GET") {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         return Response.json({ isAdmin: await isAdminRequest(database, request), name: await adminName(database, request) });
       }
       if (new URL(request.url).pathname === "/api/admin/logout" && request.method === "POST") {
-        const cookie = await logoutAdmin(getLocalDatabase(), request);
+        const cookie = await logoutAdmin(getDatabase(), request);
         return new Response("{}", { headers: { "content-type": "application/json", ...(cookie ? { "set-cookie": cookie } : {}) } });
       }
       if (new URL(request.url).pathname === "/api/admin/notifications" && request.method === "GET") {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         if (!await isAdminRequest(database, request)) return Response.json({ error: "Admin authentication required" }, { status: 401 });
         return Response.json(await listNotifications(database));
       }
       if (requestUrl.pathname === "/api/admin/notifications/read" && request.method === "POST") {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         if (!await isAdminRequest(database, request)) return Response.json({ error: "Admin authentication required" }, { status: 401 });
         await markNotificationsRead(database);
         return Response.json({ marked: true });
       }
       if (requestUrl.pathname === "/api/admin/settings" && (request.method === "GET" || request.method === "PUT")) {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         if (!await isAdminRequest(database, request)) return Response.json({ error: "Admin authentication required" }, { status: 401 });
-        const defaults = { storeName: "Big Pee Kicks", email: "hello@bigpeekicks.com", standardShipping: "12", expressShipping: "28", promoCode: "BIGPEE10", promoDiscount: "10", adminPhone: process.env["ADMIN_PHONE"] ?? "" };
+        const defaults = { storeName: "Big Pee Kicks", email: "hello@bigpeekicks.com", standardShipping: "12", expressShipping: "28", freeDeliveryThreshold: "200", promoCode: "BIGPEE10", promoDiscount: "10", adminPhone: process.env["ADMIN_PHONE"] ?? "" };
         if (request.method === "GET") {
           const rows = await database.prepare("SELECT key, value FROM store_settings").bind().all<{ key: keyof typeof defaults; value: string }>();
           return Response.json(rows.results.reduce((settings, row) => ({ ...settings, [row.key]: row.value }), defaults));
         }
         const settings = await request.json() as Partial<typeof defaults>;
+        const previousRows = await database.prepare("SELECT key, value FROM store_settings").bind().all<{ key: keyof typeof defaults; value: string }>();
+        const previous = previousRows.results.reduce((values, row) => ({ ...values, [row.key]: row.value }), {} as Partial<typeof defaults>);
+        const changedSettings = (Object.keys(defaults) as Array<keyof typeof defaults>).filter((key) => typeof settings[key] === "string" && settings[key] !== previous[key]);
         for (const key of Object.keys(defaults) as Array<keyof typeof defaults>) if (typeof settings[key] === "string") await database.prepare("INSERT INTO store_settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(key, settings[key], new Date().toISOString()).run();
+        if (changedSettings.length) {
+          const labels: Record<keyof typeof defaults, string> = { storeName: "Store name", email: "Support email", standardShipping: "Standard delivery", expressShipping: "Express delivery", freeDeliveryThreshold: "Free delivery threshold", promoCode: "Promo code", promoDiscount: "Promo discount", adminPhone: "Admin SMS phone" };
+          const changes = changedSettings.map((key) => `${labels[key]}: ${settings[key]}`).join("; ");
+          const message = `Admin settings updated. Changed ${changedSettings.length} field(s): ${changes}. Review checkout and store operations if shipping, promotion, or contact details changed.`;
+          await createNotification(database, "Admin settings updated", message, undefined, "settings");
+          await sendArkeselSms([await getAdminPhone(database)], `Big Pee Kicks admin alert: settings updated. ${changes}.`).catch((error) => console.error(error));
+        }
         return Response.json({ saved: true });
       }
       if (requestUrl.pathname === "/api/admin/shipping-rates" && (request.method === "GET" || request.method === "PUT")) {
-        const database = getLocalDatabase();
+        const database = getDatabase();
         if (!await isAdminRequest(database, request)) return Response.json({ error: "Admin authentication required" }, { status: 401 });
         if (request.method === "GET") return Response.json((await database.prepare("SELECT location, standard, express FROM shipping_rates ORDER BY location").bind().all<{ location: string; standard: number; express: number }>()).results);
         const rates = await request.json() as Array<{ location: string; standard: number; express: number }>;
         for (const rate of rates) if (rate.location && Number.isFinite(rate.standard) && Number.isFinite(rate.express) && rate.standard >= 0 && rate.express >= 0) await database.prepare("INSERT INTO shipping_rates (location, standard, express, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(location) DO UPDATE SET standard = excluded.standard, express = excluded.express, updated_at = excluded.updated_at").bind(rate.location.trim(), rate.standard, rate.express, new Date().toISOString()).run();
+        if (rates.length) {
+          const summary = rates.map((rate) => `${rate.location}: standard GHS ${rate.standard.toFixed(2)}, express GHS ${rate.express.toFixed(2)}`).join("; ");
+          await createNotification(database, "Delivery rates updated", `Admin updated delivery-by-location rates. ${summary}.`, undefined, "settings");
+          await sendArkeselSms([await getAdminPhone(database)], `Big Pee Kicks admin alert: delivery rates updated. ${summary}.`).catch((error) => console.error(error));
+        }
         return Response.json({ saved: true });
       }
       if (new URL(request.url).pathname === "/api/payments/paystack/initialize" && request.method === "POST") {
         const payload = await request.json() as Parameters<typeof createPendingOrder>[1];
         if (!payload.email || !payload.name || !payload.lines?.length || typeof payload.total !== "number") return Response.json({ error: "Complete checkout details are required" }, { status: 400 });
-        const database = getLocalDatabase();
+        const database = getDatabase();
         const orderId = await createPendingOrder(database, payload);
         const payment = await initializePaystackPayment({ email: payload.email, amount: payload.total, callbackUrl: new URL(`/order-confirmation?orderId=${orderId}`, request.url).toString(), metadata: { orderId } });
         await attachPaymentReference(database, orderId, payment.reference);
@@ -368,7 +383,7 @@ export default {
         if (!payload.reference) return Response.json({ error: "Payment reference is required" }, { status: 400 });
         const verified = await verifyPaystackPayment(payload.reference);
         if (!verified) return Response.json({ paid: false }, { status: 402 });
-        await markOrderPaid(getLocalDatabase(), payload.reference);
+        await markOrderPaid(getDatabase(), payload.reference);
         return Response.json({ paid: true });
       }
       if (new URL(request.url).pathname === "/api/payments/paystack/webhook" && request.method === "POST") {
@@ -380,7 +395,7 @@ export default {
         const expectedBuffer = Buffer.from(expected);
         if (!signature || !expected || signatureBuffer.length !== expectedBuffer.length || !timingSafeEqual(signatureBuffer, expectedBuffer)) return Response.json({ error: "Invalid signature" }, { status: 401 });
         const event = JSON.parse(body) as { event?: string; data?: { reference?: string } };
-        if (event.event === "charge.success" && event.data?.reference) await markOrderPaid(getLocalDatabase(), event.data.reference);
+        if (event.event === "charge.success" && event.data?.reference) await markOrderPaid(getDatabase(), event.data.reference);
         return Response.json({ received: true });
       }
       const handler = await getServerEntry();

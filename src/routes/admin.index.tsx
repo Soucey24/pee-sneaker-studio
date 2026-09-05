@@ -45,11 +45,7 @@ function InventoryPage() {
       toast.error("Enter at least one EU size");
       return;
     }
-    updateProduct(sizeEditor.id, {
-      sizes,
-    });
-    toast.success(`${sizeEditor.name} sizes updated`);
-    setSizeEditor(null);
+    void updateProduct(sizeEditor.id, { sizes }).then(() => { toast.success(`${sizeEditor.name} sizes updated`); setSizeEditor(null); }).catch((error) => toast.error(error instanceof Error ? error.message : "Unable to update sizes"));
   };
   return (
     <div className="mx-auto max-w-7xl px-5 pb-20 pt-8">
@@ -143,19 +139,13 @@ function InventoryPage() {
                 type="number"
                 min="0"
                 value={product.stock}
-                onChange={(event) =>
-                  updateProduct(product.id, { stock: Math.max(0, Number(event.target.value)) })
-                }
+                onChange={(event) => void updateProduct(product.id, { stock: Math.max(0, Number(event.target.value)) }).catch((error) => toast.error(error instanceof Error ? error.message : "Unable to update stock"))}
                 className="w-20 rounded border border-border bg-background px-2 py-2 text-sm"
                 aria-label={`Stock for ${product.name}`}
               />
               <select
                 value={product.status}
-                onChange={(event) =>
-                  updateProduct(product.id, {
-                    status: event.target.value as CatalogProduct["status"],
-                  })
-                }
+                onChange={(event) => void updateProduct(product.id, { status: event.target.value as CatalogProduct["status"] }).catch((error) => toast.error(error instanceof Error ? error.message : "Unable to update status"))}
                 className="rounded border border-border bg-background px-2 py-2 text-sm"
               >
                 <option>Active</option>
@@ -183,7 +173,7 @@ function InventoryPage() {
         <p className="py-12 text-center text-muted-foreground">No products match these filters.</p>
       )}
       {sizeEditor && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 px-5 backdrop-blur-sm"><div className="w-full max-w-md border border-border bg-surface p-6 shadow-deep"><h2 className="font-display text-lg">Edit EU sizes</h2><p className="mt-2 text-sm text-muted-foreground">{sizeEditor.name}</p><input autoFocus value={sizeValue} onChange={(event) => setSizeValue(event.target.value)} placeholder="40, 41, 42, 43" className="mt-5 w-full rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary" /><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setSizeEditor(null)} className="rounded-md border border-border px-4 py-2 text-xs text-muted-foreground">Cancel</button><button type="button" onClick={saveSizes} className="ember-fill rounded-md px-4 py-2 font-display text-xs tracking-widest">Save sizes</button></div></div></div>}
-      {deleteTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 px-5 backdrop-blur-sm"><div className="w-full max-w-md border border-border bg-surface p-6 shadow-deep"><h2 className="font-display text-lg">Delete product?</h2><p className="mt-2 text-sm text-muted-foreground">This will remove {deleteTarget.name} from inventory.</p><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setDeleteTarget(null)} className="rounded-md border border-border px-4 py-2 text-xs text-muted-foreground">Cancel</button><button type="button" onClick={() => { removeProduct(deleteTarget.id); toast.success(`${deleteTarget.name} deleted`); setDeleteTarget(null); }} className="rounded-md border border-red-400 px-4 py-2 text-xs text-red-400">Delete product</button></div></div></div>}
+      {deleteTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 px-5 backdrop-blur-sm"><div className="w-full max-w-md border border-border bg-surface p-6 shadow-deep"><h2 className="font-display text-lg">Delete product?</h2><p className="mt-2 text-sm text-muted-foreground">This will remove {deleteTarget.name} from inventory.</p><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setDeleteTarget(null)} className="rounded-md border border-border px-4 py-2 text-xs text-muted-foreground">Cancel</button><button type="button" onClick={() => void removeProduct(deleteTarget.id).then(() => { toast.success(`${deleteTarget.name} deleted`); setDeleteTarget(null); }).catch((error) => toast.error(error instanceof Error ? error.message : "Unable to delete product"))} className="rounded-md border border-red-400 px-4 py-2 text-xs text-red-400">Delete product</button></div></div></div>}
       <AddProductModal open={open} onClose={() => setOpen(false)} onAdd={addProduct} />
     </div>
   );

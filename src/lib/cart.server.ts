@@ -35,12 +35,12 @@ export async function getCartId(database: CatalogDatabase, request: Request): Pr
 }
 
 export async function readCart(database: CatalogDatabase, cartId: string): Promise<CartLine[]> {
-  const result = await database.prepare(`SELECT p.id, p.category, p.name, p.tag, p.price, p.image_url, p.description, p.popularity, p.created_at, ci.size, ci.quantity FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.cart_id = ? ORDER BY ci.rowid`).bind(cartId).all<CartRow>();
+  const result = await database.prepare(`SELECT p.id, p.category, p.name, p.tag, p.price, p.image_url, p.description, p.popularity, p.created_at, ci.size, ci.quantity FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.cart_id = ? ORDER BY ci.product_id, ci.size`).bind(cartId).all<CartRow>();
   return result.results.map((row) => ({ product: { id: row.id, category: row.category, name: row.name, tag: row.tag, price: row.price, image: row.image_url, sizes: [row.size], description: row.description, popularity: row.popularity, createdAt: row.created_at }, size: row.size, qty: row.quantity }));
 }
 
 export async function replaceCart(database: CatalogDatabase, cartId: string, lines: CartLine[]): Promise<CartLine[]> {
-  await database.prepare("INSERT OR IGNORE INTO carts (id, created_at, updated_at) VALUES (?, ?, ?)").bind(cartId, new Date().toISOString(), new Date().toISOString()).run();
+  await database.prepare("INSERT INTO carts (id, created_at, updated_at) VALUES (?, ?, ?) ON CONFLICT (id) DO NOTHING").bind(cartId, new Date().toISOString(), new Date().toISOString()).run();
   await database.prepare("DELETE FROM cart_items WHERE cart_id = ?").bind(cartId).run();
   for (const line of lines) {
     const product = await database.prepare("SELECT id FROM products WHERE id = ?").bind(line.product.id).all<{ id: string }>();

@@ -1,7 +1,7 @@
 import type { CatalogDatabase } from "@/lib/catalog.server";
 
-export async function createNotification(database: CatalogDatabase, title: string, message: string, orderId?: string): Promise<void> {
-  await database.prepare("INSERT INTO notifications (type, title, message, order_id, created_at) VALUES (?, ?, ?, ?, ?)").bind("order", title, message, orderId ?? null, new Date().toISOString()).run();
+export async function createNotification(database: CatalogDatabase, title: string, message: string, orderId?: string, type = "order"): Promise<void> {
+  await database.prepare("INSERT INTO notifications (type, title, message, order_id, created_at) VALUES (?, ?, ?, ?, ?)").bind(type, title, message, orderId ?? null, new Date().toISOString()).run();
 }
 
 export async function listNotifications(database: CatalogDatabase) {

@@ -5,9 +5,9 @@ export type { CatalogProduct } from "@/data/products";
 
 type CatalogContextValue = {
   products: CatalogProduct[];
-  addProduct: (product: Omit<CatalogProduct, "id">) => void;
-  updateProduct: (id: string, changes: Partial<CatalogProduct>) => void;
-  removeProduct: (id: string) => void;
+  addProduct: (product: Omit<CatalogProduct, "id">) => Promise<void>;
+  updateProduct: (id: string, changes: Partial<CatalogProduct>) => Promise<void>;
+  removeProduct: (id: string) => Promise<void>;
 };
 
 const CatalogContext = createContext<CatalogContextValue | null>(null);
@@ -42,35 +42,35 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, []);
 
-  const addProduct = (product: Omit<CatalogProduct, "id">) => {
+  const addProduct = async (product: Omit<CatalogProduct, "id">) => {
     const nextProduct = { ...product, id: `product-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
     pendingAdds.current.set(nextProduct.id, nextProduct);
     setCatalogProducts((currentProducts) => [nextProduct, ...currentProducts]);
-    void fetch("/api/products", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create", product: nextProduct }) })
-      .then((response) => { if (!response.ok) throw new Error("Unable to save product"); return response.json(); })
-      .then(() => { pendingAdds.current.delete(nextProduct.id); })
-      .catch(() => {
-        pendingAdds.current.delete(nextProduct.id);
-        setCatalogProducts((currentProducts) => currentProducts.filter((currentProduct) => currentProduct.id !== nextProduct.id));
-      });
+    try {
+      const response = await fetch("/api/products", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create", product: nextProduct }) });
+      if (!response.ok) throw new Error((await response.json() as { error?: string }).error ?? "Unable to save product");
+      pendingAdds.current.delete(nextProduct.id);
+    } catch (error) {
+      pendingAdds.current.delete(nextProduct.id);
+      setCatalogProducts((currentProducts) => currentProducts.filter((currentProduct) => currentProduct.id !== nextProduct.id));
+      throw error;
+    }
   };
 
-  const updateProduct = (id: string, changes: Partial<CatalogProduct>) => {
+  const updateProduct = async (id: string, changes: Partial<CatalogProduct>) => {
     const nextProducts = catalogProducts.map((product) => (product.id === id ? { ...product, ...changes } : product));
     const nextProduct = nextProducts.find((product) => product.id === id);
     if (!nextProduct) return;
-    void fetch("/api/products", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "update", product: nextProduct }) })
-      .then((response) => { if (!response.ok) throw new Error("Unable to update product"); return response.json(); })
-      .then(() => setCatalogProducts(nextProducts))
-      .catch(() => setCatalogProducts(nextProducts));
+    const response = await fetch("/api/products", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "update", product: nextProduct }) });
+    if (!response.ok) throw new Error((await response.json() as { error?: string }).error ?? "Unable to update product");
+    setCatalogProducts(nextProducts);
   };
 
-  const removeProduct = (id: string) => {
+  const removeProduct = async (id: string) => {
     const nextProducts = catalogProducts.filter((product) => product.id !== id);
-    void fetch("/api/products", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "delete", id }) })
-      .then((response) => { if (!response.ok) throw new Error("Unable to delete product"); return response.json(); })
-      .then(() => setCatalogProducts(nextProducts))
-      .catch(() => setCatalogProducts(nextProducts));
+    const response = await fetch("/api/products", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "delete", id }) });
+    if (!response.ok) throw new Error((await response.json() as { error?: string }).error ?? "Unable to delete product");
+    setCatalogProducts(nextProducts);
   };
 
   return (

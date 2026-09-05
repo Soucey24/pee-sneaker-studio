@@ -28,7 +28,7 @@ export async function listActiveProducts(database: CatalogDatabase): Promise<Cat
     .prepare(
       `SELECT p.id, p.category, p.name, p.tag, p.price, p.image_url, p.description,
               p.popularity, p.created_at,
-              GROUP_CONCAT(ps.size) AS sizes,
+              STRING_AGG(ps.size::text, ',') AS sizes,
               COALESCE(MAX(ps.stock), 0) AS stock
        FROM products p
        LEFT JOIN product_sizes ps ON ps.product_id = p.id

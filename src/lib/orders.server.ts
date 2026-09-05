@@ -35,6 +35,7 @@ export async function createPendingOrder(database: CatalogDatabase, input: Pendi
   for (const line of input.lines) {
     await database.prepare("INSERT INTO order_items (order_id, product_id, product_name, size, quantity, unit_price) VALUES (?, ?, ?, ?, ?, ?)").bind(orderId, line.product.id, line.product.name, line.size, line.qty, line.product.price).run();
   }
+  await createNotification(database, "New order awaiting payment", `Order ${orderId} was placed by ${input.name}. Amount due: GHS ${input.total.toFixed(2)}. Delivery: ${input.city}, ${input.country}. Payment is still pending.`, orderId);
   return orderId;
 }
 
@@ -45,11 +46,11 @@ export async function markOrderPaid(database: CatalogDatabase, reference: string
   await database.prepare("UPDATE orders SET payment_status = 'Paid', paid_at = ? WHERE id = ? AND payment_status = 'Pending'").bind(new Date().toISOString(), order.results[0].id).run();
   const items = await database.prepare("SELECT product_id, size, quantity FROM order_items WHERE order_id = ?").bind(order.results[0].id).all<{ product_id: string; size: number; quantity: number }>();
   for (const item of items.results) {
-    await database.prepare("UPDATE product_sizes SET stock = MAX(0, stock - ?) WHERE product_id = ? AND size = ?").bind(item.quantity, item.product_id, item.size).run();
+    await database.prepare("UPDATE product_sizes SET stock = GREATEST(0, stock - ?) WHERE product_id = ? AND size = ?").bind(item.quantity, item.product_id, item.size).run();
   }
-  await createNotification(database, "Payment received", `${order.results[0].delivery_name}'s order ${order.results[0].id} is paid.`, order.results[0].id);
-  await sendArkeselSms([order.results[0].delivery_phone ?? "", order.results[0].recipient_phone ?? ""], `Big Pee Kicks: payment received for order ${order.results[0].id}. Thank you.`).catch((error) => console.error(error));
-  await sendArkeselSms([await getAdminPhone(database)], `Big Pee Kicks admin: payment received for order ${order.results[0].id} from ${order.results[0].delivery_name}.`).catch((error) => console.error(error));
+  await createNotification(database, "Payment confirmed", `Payment confirmed for order ${order.results[0].id}. Buyer: ${order.results[0].delivery_name}. Amount paid: GHS ${order.results[0].total.toFixed(2)}. Stock was updated and the order is ready for processing.`, order.results[0].id);
+  await sendArkeselSms([order.results[0].delivery_phone ?? "", order.results[0].recipient_phone ?? ""], `Big Pee Kicks: payment confirmed for order ${order.results[0].id}. Amount paid: GHS ${order.results[0].total.toFixed(2)}. We will prepare your delivery.`).catch((error) => console.error(error));
+  await sendArkeselSms([await getAdminPhone(database)], `Big Pee Kicks admin: payment confirmed. Order ${order.results[0].id}, buyer ${order.results[0].delivery_name}, amount GHS ${order.results[0].total.toFixed(2)}. Please process the order.`).catch((error) => console.error(error));
 }
 
 export async function attachPaymentReference(database: CatalogDatabase, orderId: string, reference: string): Promise<void> {
@@ -78,10 +79,13 @@ export async function listOrders(database: CatalogDatabase, customerId?: string,
 }
 
 export async function requestOrderReturn(database: CatalogDatabase, orderId: string, email?: string, reason = "Buyer requested a return") {
-  const order = await database.prepare(`SELECT o.id FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id = ? ${email ? "AND c.email = ?" : ""}`).bind(...(email ? [orderId, email] : [orderId])).all<{ id: string }>();
+  const order = await database.prepare(`SELECT o.id, o.delivery_name, o.total FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id = ? ${email ? "AND LOWER(c.email) = LOWER(?)" : ""}`).bind(...(email ? [orderId, email] : [orderId])).all<{ id: string; delivery_name: string; total: number }>();
   if (!order.results[0]) throw new Error("Order not found");
   const existing = await database.prepare("SELECT id FROM returns WHERE order_id = ?").bind(orderId).all<{ id: number }>();
-  if (!existing.results[0]) await database.prepare("INSERT INTO returns (order_id, reason, status, created_at) VALUES (?, ?, 'Requested', ?)").bind(orderId, reason, new Date().toISOString()).run();
+  if (!existing.results[0]) {
+    await database.prepare("INSERT INTO returns (order_id, reason, status, created_at) VALUES (?, ?, 'Requested', ?)").bind(orderId, reason, new Date().toISOString()).run();
+    await createNotification(database, "Return request received", `Buyer ${order.results[0].delivery_name} requested a return for order ${orderId}. Order amount: GHS ${order.results[0].total.toFixed(2)}. Reason: ${reason}. Admin review is required.`, orderId);
+  }
 }
 
 export async function updateReturnStatus(database: CatalogDatabase, orderId: string, status: string): Promise<void> {
@@ -89,8 +93,8 @@ export async function updateReturnStatus(database: CatalogDatabase, orderId: str
   const order = await database.prepare("SELECT delivery_name, delivery_phone, recipient_phone FROM orders WHERE id = ?").bind(orderId).all<{ delivery_name: string; delivery_phone: string | null; recipient_phone: string | null }>();
   if (!order.results[0]) throw new Error("Order not found");
   await database.prepare("UPDATE returns SET status = ? WHERE order_id = ?").bind(status, orderId).run();
-  await createNotification(database, `Return ${status.toLowerCase()}`, `${order.results[0].delivery_name}'s return request for ${orderId} was ${status.toLowerCase()}.`, orderId);
-  await sendArkeselSms([order.results[0].delivery_phone ?? "", order.results[0].recipient_phone ?? ""], `Big Pee Kicks: your return request for order ${orderId} was ${status.toLowerCase()}.`).catch((error) => console.error(error));
+  await createNotification(database, `Return ${status.toLowerCase()}`, `Return decision for order ${orderId}: ${status}. Buyer: ${order.results[0].delivery_name}. The buyer has been notified by SMS.`, orderId);
+  await sendArkeselSms([order.results[0].delivery_phone ?? "", order.results[0].recipient_phone ?? ""], `Big Pee Kicks: your return request for order ${orderId} was ${status.toLowerCase()}. Please check your account for the next steps.`).catch((error) => console.error(error));
 }
 
 export async function updateOrderStatus(database: CatalogDatabase, orderId: string, status: string): Promise<void> {
@@ -99,8 +103,8 @@ export async function updateOrderStatus(database: CatalogDatabase, orderId: stri
   if (!order.results[0]) throw new Error("Order not found");
   await database.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, orderId).run();
   if (status === "Shipped") {
-    await createNotification(database, "Order shipped", `${order.results[0].delivery_name}'s order ${orderId} has shipped.`, orderId);
-    await sendArkeselSms([order.results[0].delivery_phone ?? "", order.results[0].recipient_phone ?? ""], `Big Pee Kicks: order ${orderId} has shipped.`).catch((error) => console.error(error));
-    await sendArkeselSms([await getAdminPhone(database)], `Big Pee Kicks admin: order ${orderId} was marked as shipped.`).catch((error) => console.error(error));
+    await createNotification(database, "Order shipped", `Order ${orderId} for ${order.results[0].delivery_name} was marked as shipped. The buyer has been notified by SMS.`, orderId);
+    await sendArkeselSms([order.results[0].delivery_phone ?? "", order.results[0].recipient_phone ?? ""], `Big Pee Kicks: order ${orderId} has shipped. Please keep your phone available for delivery updates.`).catch((error) => console.error(error));
+    await sendArkeselSms([await getAdminPhone(database)], `Big Pee Kicks admin: order ${orderId} for ${order.results[0].delivery_name} was marked as shipped successfully.`).catch((error) => console.error(error));
   }
 }

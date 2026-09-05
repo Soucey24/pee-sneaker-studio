@@ -6,7 +6,7 @@ import { toast } from "sonner";
 type AddProductModalProps = {
   open: boolean;
   onClose: () => void;
-  onAdd: (product: Omit<Product, "id"> & { stock: number; status: "Active" | "Draft" | "Archived" }) => void;
+  onAdd: (product: Omit<Product, "id"> & { stock: number; status: "Active" | "Draft" | "Archived" }) => Promise<void>;
 };
 
 const categoryOptions: Product["category"][] = ["Shoes", "Sneakers", "Slippers"];
@@ -43,13 +43,13 @@ export function AddProductModal({ open, onClose, onAdd }: AddProductModalProps) 
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!imageFile || !imagePreview) {
       setImageError("Upload a product image before saving.");
       return;
     }
-    onAdd({
+    try { await onAdd({
       name: formData.name,
       category: formData.category,
       tag: formData.tag,
@@ -61,7 +61,7 @@ export function AddProductModal({ open, onClose, onAdd }: AddProductModalProps) 
       createdAt: new Date().toISOString().slice(0, 10),
       stock: formData.stock,
       status: formData.status,
-    });
+    }); } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to save product"); return; }
     toast.success(`${formData.name} added to inventory`);
     setFormData({
       name: "",
