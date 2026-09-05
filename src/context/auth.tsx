@@ -3,11 +3,11 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 type AuthCtx = {
   isAdmin: boolean;
   adminName: string | null;
-  login: (password: string) => boolean;
-  logout: () => void;
+  login: (password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   buyer: { id: string; name: string; email: string } | null;
-  buyerLogin: (email: string, password: string) => boolean;
-  buyerRegister: (name: string, email: string, password: string) => boolean;
+  buyerLogin: (email: string, password: string) => Promise<boolean>;
+  buyerRegister: (name: string, email: string, password: string) => Promise<boolean>;
   buyerLogout: () => void;
 };
 
@@ -19,11 +19,6 @@ export function useAuth() {
   return ctx;
 }
 
-// Simple password check (demo only; never use in production)
-const ADMIN_PASSWORD = "bigpee";
-const BUYER_ACCOUNT_KEY = "big-pee-buyer";
-const BUYER_ACCOUNTS_KEY = "big-pee-buyer-accounts";
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -32,65 +27,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [buyer, setBuyer] = useState<AuthCtx["buyer"]>(null);
 
   useEffect(() => {
-    setIsAdmin(localStorage.getItem("admin-session") === "true");
-    setAdminName(localStorage.getItem("admin-name"));
-    try {
-      setBuyer(JSON.parse(localStorage.getItem(BUYER_ACCOUNT_KEY) ?? "null") as AuthCtx["buyer"]);
-    } catch {
-      setBuyer(null);
-    }
+    void fetch("/api/admin/session").then((response) => response.json() as Promise<{ isAdmin: boolean; name: string | null }>).then((session) => {
+      setIsAdmin(session.isAdmin);
+      setAdminName(session.name);
+    }).catch(() => setIsAdmin(false));
+    void fetch("/api/buyer/session").then((response) => response.ok ? response.json() as Promise<AuthCtx["buyer"]> : null).then(setBuyer).catch(() => setBuyer(null));
   }, []);
 
-  const readBuyerAccounts = (): Array<{ id: string; name: string; email: string; password: string }> => {
-    try {
-      return JSON.parse(localStorage.getItem(BUYER_ACCOUNTS_KEY) ?? "[]") as Array<{ id: string; name: string; email: string; password: string }>;
-    } catch {
-      return [];
-    }
-  };
-
-  const saveBuyer = (account: { id: string; name: string; email: string }) => {
-    setBuyer(account);
-    localStorage.setItem(BUYER_ACCOUNT_KEY, JSON.stringify(account));
-  };
-
-  const buyerLogin = (email: string, password: string) => {
-    const account = readBuyerAccounts().find((item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password);
-    if (!account) return false;
-    saveBuyer({ id: account.id, name: account.name, email: account.email });
+  const buyerLogin = async (email: string, password: string) => {
+    const response = await fetch("/api/buyer/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }) });
+    if (!response.ok) return false;
+    setBuyer(await response.json() as AuthCtx["buyer"]);
     return true;
   };
 
-  const buyerRegister = (name: string, email: string, password: string) => {
-    const accounts = readBuyerAccounts();
-    if (accounts.some((item) => item.email.toLowerCase() === email.trim().toLowerCase())) return false;
-    const account = { id: `buyer-${Date.now()}`, name: name.trim(), email: email.trim(), password };
-    localStorage.setItem(BUYER_ACCOUNTS_KEY, JSON.stringify([...accounts, account]));
-    saveBuyer({ id: account.id, name: account.name, email: account.email });
+  const buyerRegister = async (name: string, email: string, password: string) => {
+    const response = await fetch("/api/buyer/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, email, password }) });
+    if (!response.ok) return false;
+    setBuyer(await response.json() as AuthCtx["buyer"]);
     return true;
   };
 
   const buyerLogout = () => {
+    void fetch("/api/buyer/logout", { method: "POST" });
     setBuyer(null);
-    localStorage.removeItem(BUYER_ACCOUNT_KEY);
   };
 
-  const login = (password: string): boolean => {
-    if (password === ADMIN_PASSWORD) {
-      setIsAdmin(true);
-      setAdminName("Big Pee");
-      localStorage.setItem("admin-session", "true");
-      localStorage.setItem("admin-name", "Big Pee");
-      return true;
-    }
-    return false;
+  const login = async (password: string): Promise<boolean> => {
+    const response = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
+    if (!response.ok) return false;
+    const session = await response.json() as { name: string };
+    setIsAdmin(true);
+    setAdminName(session.name);
+    return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await fetch("/api/admin/logout", { method: "POST" });
     setIsAdmin(false);
     setAdminName(null);
-    localStorage.removeItem("admin-session");
-    localStorage.removeItem("admin-name");
   };
 
   return (

@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { Heart } from "lucide-react";
 import type { Product } from "@/data/products";
 import { useWishlist } from "@/context/wishlist";
+import { formatPrice } from "@/lib/currency";
+import { toast } from "sonner";
 
 export function ProductCard({
   product,
@@ -29,7 +31,7 @@ export function ProductCard({
             className="size-full object-cover transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-3"
           />
         </Link>
-        <button onClick={() => toggle(product.id)} aria-label={has(product.id) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`} className="absolute right-2 top-2 rounded-full border border-border bg-background/80 p-1.5 backdrop-blur transition-colors hover:border-primary sm:right-3 sm:top-3 sm:p-2">
+        <button onClick={() => { const removing = has(product.id); toggle(product.id); toast.success(removing ? `${product.name} removed from wishlist` : `${product.name} saved to wishlist`); }} aria-label={has(product.id) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`} className="absolute right-2 top-2 rounded-full border border-border bg-background/80 p-1.5 backdrop-blur transition-colors hover:border-primary sm:right-3 sm:top-3 sm:p-2">
           <Heart className={`size-3.5 sm:size-4 ${has(product.id) ? "fill-primary text-primary" : "text-foreground"}`} />
         </button>
         <span className="absolute left-3 top-3 rounded-full border border-border bg-background/70 px-3 py-1 text-[11px] uppercase tracking-widest text-primary backdrop-blur">
@@ -41,7 +43,7 @@ export function ProductCard({
         <div className="flex items-baseline justify-between gap-2">
           <Link to="/products/$productId" params={{ productId: product.id }} className="min-w-0 break-words text-xs transition-colors hover:text-primary sm:text-base">{product.name}</Link>
           <span className="font-display text-xs text-primary sm:text-base">
-            ${product.price}
+            {formatPrice(product.price)}
           </span>
         </div>
 

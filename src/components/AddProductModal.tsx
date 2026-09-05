@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { Product } from "@/data/products";
+import { toast } from "sonner";
 
 type AddProductModalProps = {
   open: boolean;
@@ -61,6 +62,7 @@ export function AddProductModal({ open, onClose, onAdd }: AddProductModalProps) 
       stock: formData.stock,
       status: formData.status,
     });
+    toast.success(`${formData.name} added to inventory`);
     setFormData({
       name: "",
       category: "Shoes",
@@ -85,8 +87,8 @@ export function AddProductModal({ open, onClose, onAdd }: AddProductModalProps) 
         onClick={onClose}
         className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm transition-opacity"
       />
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-5 py-10 overflow-y-auto">
-        <div className="w-full max-w-md border border-border bg-surface rounded-xl p-8 relative">
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-4 sm:items-center sm:px-5 sm:py-8">
+        <div className="my-auto max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-border bg-surface p-5 relative sm:max-h-[calc(100vh-4rem)] sm:p-8">
           <button
             onClick={onClose}
             className="absolute right-4 top-4 rounded-full p-2 text-muted-foreground transition-colors hover:text-foreground"

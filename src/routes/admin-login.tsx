@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
-import { Lock } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/context/auth";
 import { BackButton } from "@/components/BackButton";
@@ -20,6 +20,7 @@ function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   if (isAdmin) return <Navigate to="/admin" />;
 
@@ -31,7 +32,7 @@ function AdminLoginPage() {
     // Simulate a small delay for UX
     await new Promise((resolve) => setTimeout(resolve, 300));
 
-    if (login(password)) {
+    if (await login(password)) {
       navigate({ to: "/admin" });
     } else {
       setError("Invalid password. Try again.");
@@ -55,15 +56,7 @@ function AdminLoginPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            disabled={loading}
-            className="w-full rounded-md border border-border bg-background px-4 py-3 text-sm outline-none transition-colors focus:border-primary disabled:opacity-50"
-            autoFocus
-          />
+          <div className="relative"><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" disabled={loading} className="w-full rounded-md border border-border bg-background px-4 py-3 pr-11 text-sm outline-none transition-colors focus:border-primary disabled:opacity-50" autoFocus /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground" aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></div>
           {error && <p className="text-sm text-red-400">{error}</p>}
           <button
             type="submit"
@@ -75,7 +68,7 @@ function AdminLoginPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          <span className="block">Demo password: <span className="font-mono text-primary">bigpee</span></span>
+          <span className="block">Use the configured admin password.</span>
         </p>
       </div>
     </div>

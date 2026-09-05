@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, UserRound } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, UserRound } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/context/auth";
 import { BackButton } from "@/components/BackButton";
@@ -16,16 +16,17 @@ function BuyerLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   if (buyer) {
     navigate({ to: "/account" });
     return null;
   }
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
-    const valid = mode === "signin" ? buyerLogin(email, password) : buyerRegister(name, email, password);
+    const valid = mode === "signin" ? await buyerLogin(email, password) : await buyerRegister(name, email, password);
     if (!valid) {
       setError(mode === "signin" ? "Email or password is incorrect." : "An account with that email already exists.");
       return;
@@ -45,7 +46,7 @@ function BuyerLoginPage() {
         <form onSubmit={submit} className="mt-6 space-y-4">
           {mode === "register" && <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" className="w-full rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary" />}
           <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email address" className="w-full rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary" />
-          <input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password (6+ characters)" className="w-full rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary" />
+          <div className="relative"><input required minLength={6} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password (6+ characters)" className="w-full rounded-md border border-border bg-background px-4 py-3 pr-11 text-sm outline-none focus:border-primary" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground" aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></div>
           {error && <p className="text-sm text-red-400">{error}</p>}
           <button type="submit" className="ember-fill w-full rounded-md py-3 font-display text-xs tracking-widest">{mode === "signin" ? "Sign in" : "Create account"}</button>
         </form>

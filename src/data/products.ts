@@ -17,6 +17,11 @@ export type Product = {
   createdAt: string;
 };
 
+export type CatalogProduct = Product & {
+  stock: number;
+  status: "Active" | "Draft" | "Archived";
+};
+
 export const products: Product[] = [
   {
     id: "ember-hi",

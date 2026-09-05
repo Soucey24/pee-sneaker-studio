@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { Package, LogOut, Menu, X, ShoppingCart, CreditCard, Users, RotateCcw, LayoutDashboard, Settings } from "lucide-react";
-import { useState } from "react";
+import { Bell, Package, LogOut, Menu, X, ShoppingCart, CreditCard, Users, RotateCcw, LayoutDashboard, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/auth";
 import { BackButton } from "@/components/BackButton";
 import logo from "../../logo/logo.png";
@@ -18,6 +18,9 @@ const navItems = [
 export function AdminSidebar() {
   const { adminName, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{ id: number; title: string; message: string; read_at: string | null; created_at: string }>>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  useEffect(() => { void fetch("/api/admin/notifications").then((response) => response.ok ? response.json() as Promise<typeof notifications> : Promise.reject()).then(setNotifications).catch(() => undefined); }, []);
 
   return (
     <>
@@ -39,7 +42,8 @@ export function AdminSidebar() {
             </button>
           </div>
 
-          <nav className="flex-1 space-y-1 px-3 py-5">
+          <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-5">
+            <div className="relative mb-3"><button type="button" onClick={() => { setShowNotifications((value) => !value); if (notifications.some((notification) => !notification.read_at)) { void fetch("/api/admin/notifications/read", { method: "POST" }).then(() => setNotifications((current) => current.map((notification) => ({ ...notification, read_at: notification.read_at ?? new Date().toISOString() })))); } }} className="flex w-full items-center gap-3 rounded-md px-4 py-2.5 text-sm font-display text-muted-foreground hover:text-foreground" aria-label="Open notifications"><Bell className="size-4" /> Notifications {notifications.filter((notification) => !notification.read_at).length > 0 && <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-foreground">{notifications.filter((notification) => !notification.read_at).length}</span>}</button>{showNotifications && <div className="absolute left-3 right-3 top-12 z-10 max-h-64 overflow-y-auto border border-border bg-background p-3 shadow-deep">{notifications.length === 0 ? <p className="p-2 text-xs text-muted-foreground">No notifications yet.</p> : notifications.map((notification) => <div key={notification.id} className={`border-b border-border px-2 py-3 last:border-0 ${notification.read_at ? "opacity-60" : ""}`}><div className="flex items-center justify-between gap-2"><p className="text-xs font-display">{notification.title}</p>{!notification.read_at && <span className="text-[10px] text-primary">New</span>}</div><p className="mt-1 text-xs text-muted-foreground">{notification.message}</p><p className="mt-1 text-[10px] text-muted-foreground">{new Date(notification.created_at).toLocaleString()}</p></div>)}</div>}</div>
             {navItems.map(({ label, to, icon: Icon }) => (
               <Link
                 key={to}

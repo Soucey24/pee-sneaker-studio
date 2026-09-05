@@ -1,6 +1,7 @@
 import { X, Minus, Plus, Trash2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { Product } from "@/data/products";
+import { formatPrice } from "@/lib/currency";
 
 export type CartLine = { product: Product; size: number; qty: number };
 
@@ -86,7 +87,7 @@ export function CartDrawer({
                   </button>
                   <button onClick={() => onRemove(i)} aria-label={`Remove ${line.product.name}`} className="rounded border border-border p-1 text-muted-foreground hover:border-red-400 hover:text-red-400"><Trash2 className="size-3" /></button>
                   <span className="ml-auto text-sm text-primary">
-                    ${line.product.price * line.qty}
+                    {formatPrice(line.product.price * line.qty)}
                   </span>
                 </div>
                 {line.qty >= getLineLimit(line) && <p className="mt-2 text-xs text-primary" aria-live="polite">Maximum available quantity reached</p>}
@@ -99,7 +100,7 @@ export function CartDrawer({
         <div className="space-y-3 border-t border-border p-5">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
-            <span className="font-display text-lg">${total}</span>
+            <span className="font-display text-lg">{formatPrice(total)}</span>
           </div>
           <Link
             to="/checkout"
@@ -112,7 +113,7 @@ export function CartDrawer({
             Checkout
           </Link>
           <p className="text-center text-xs text-muted-foreground">
-            Free delivery on orders over $200
+            Free delivery on orders over {formatPrice(200)}
           </p>
         </div>
       </aside>

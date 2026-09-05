@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Product } from "@/data/products";
 import { CartDrawer, type CartLine } from "@/components/CartDrawer";
+import { toast } from "sonner";
 
 type CartCtx = {
   lines: CartLine[];
@@ -15,17 +16,6 @@ type CartCtx = {
 };
 
 const Ctx = createContext<CartCtx | null>(null);
-const STORAGE_KEY = "big-pee-cart";
-
-function readLines(): CartLine[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]") as CartLine[];
-  } catch {
-    return [];
-  }
-}
-
 export function useCart() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useCart must be used inside CartProvider");
@@ -37,8 +27,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    setLines(readLines());
+    let active = true;
+    void fetch("/api/cart").then((response) => response.ok ? response.json() as Promise<CartLine[]> : Promise.reject()).then((savedLines) => { if (active) setLines(savedLines); }).catch(() => undefined);
+    return () => { active = false; };
   }, []);
+
+  const syncCart = (next: CartLine[]) => {
+    void fetch("/api/cart", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) }).catch(() => toast.error("Your bag could not be saved"));
+  };
 
   const value = useMemo<CartCtx>(() => {
     const count = lines.reduce((s, l) => s + l.qty, 0);
@@ -52,16 +48,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const next = [...prev];
           const line = next[i]!;
           next[i] = { ...line, qty: Math.min(line.qty + quantity, (line.product as Product & { stock?: number }).stock ?? 99) };
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+          syncCart(next);
           return next;
         }
         const next = [...prev, { product, size, qty: Math.min(quantity, (product as Product & { stock?: number }).stock ?? 99) }];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        syncCart(next);
         return next;
       });
+      toast.success(`${product.name} added to your bag`);
     };
 
     const changeQty = (index: number, delta: number) => {
+      const line = lines[index];
       setLines((prev) => {
         const next = prev
           .map((line, i) => {
@@ -70,22 +68,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
             return { ...line, qty: Math.min(stock, line.qty + delta) };
           })
           .filter((line) => line.qty > 0);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        syncCart(next);
         return next;
       });
+      if (line) toast.success(delta > 0 ? "Quantity increased" : "Quantity decreased");
     };
 
         const clearCart = () => {
           setLines([]);
-          localStorage.removeItem(STORAGE_KEY);
+          void fetch("/api/cart", { method: "DELETE" }).catch(() => toast.error("Your bag could not be cleared"));
+          toast.success("Bag cleared");
         };
 
         const removeLine = (index: number) => {
+          const line = lines[index];
           setLines((prev) => {
             const next = prev.filter((_, currentIndex) => currentIndex !== index);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            syncCart(next);
             return next;
           });
+          if (line) toast.success(`${line.product.name} removed from your bag`);
         };
 
         const getLineLimit = (line: CartLine) =>

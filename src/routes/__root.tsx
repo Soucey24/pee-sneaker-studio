@@ -16,6 +16,7 @@ import { AuthProvider } from "../context/auth";
 import { CatalogProvider } from "../context/catalog";
 import { WishlistProvider } from "../context/wishlist";
 import { OrdersProvider } from "../context/orders";
+import { Toaster } from "../components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -136,6 +137,7 @@ function RootComponent() {
             <OrdersProvider>
               <CartProvider>
                 <Outlet />
+                <Toaster />
               </CartProvider>
             </OrdersProvider>
           </WishlistProvider>

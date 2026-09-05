@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { useCart } from "@/context/cart";
 import { useCatalog } from "@/context/catalog";
 import { useWishlist } from "@/context/wishlist";
+import { formatPrice } from "@/lib/currency";
 
 export const Route = createFileRoute("/products/$productId")({
   head: ({ params }) => ({ meta: [{ title: `${params.productId} | Big Pee Kicks` }] }),
@@ -42,7 +43,7 @@ function ProductDetailsPage() {
               <h1 className="text-4xl leading-none sm:text-6xl">{product.name}</h1>
               <button onClick={() => toggle(product.id)} aria-label="Toggle wishlist" className="rounded-full border border-border p-3 hover:border-primary"><Heart className={`size-5 ${has(product.id) ? "fill-primary text-primary" : ""}`} /></button>
             </div>
-            <p className="mt-5 font-display text-2xl text-primary">${product.price}</p>
+            <p className="mt-5 font-display text-2xl text-primary">{formatPrice(product.price)}</p>
             <p className="mt-6 leading-relaxed text-muted-foreground">{product.description}</p>
             <div className="mt-8 border-y border-border py-6">
               <div className="flex items-center justify-between"><span className="font-display text-sm">Select size</span><span className="text-sm text-muted-foreground">EU</span></div>

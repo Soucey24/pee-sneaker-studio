@@ -1,7 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-const STORAGE_KEY = "big-pee-wishlist";
-
 type WishlistContextValue = {
   ids: string[];
   toggle: (id: string) => void;
@@ -10,15 +8,6 @@ type WishlistContextValue = {
 
 const WishlistContext = createContext<WishlistContextValue | null>(null);
 
-function readWishlist() {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]") as string[];
-  } catch {
-    return [];
-  }
-}
-
 export function useWishlist() {
   const value = useContext(WishlistContext);
   if (!value) throw new Error("useWishlist must be used inside WishlistProvider");
@@ -26,16 +15,25 @@ export function useWishlist() {
 }
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
-  const [ids, setIds] = useState<string[]>([]);
+  const [ids, setIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = window.localStorage.getItem("big-pee-wishlist");
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved) as unknown;
+      return Array.isArray(parsed) && parsed.every((id) => typeof id === "string") ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
-    setIds(readWishlist());
-  }, []);
+    window.localStorage.setItem("big-pee-wishlist", JSON.stringify(ids));
+  }, [ids]);
 
   const toggle = (id: string) => {
     setIds((current) => {
       const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   };
