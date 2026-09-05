@@ -7,7 +7,6 @@ import seedProducts from "../../database/migrations/0002_seed_products.sql?raw";
 import productionTables from "../../database/migrations/0003_production_tables.sql?raw";
 import settings from "../../database/migrations/0004_settings.sql?raw";
 import buyerAccounts from "../../database/migrations/0005_buyer_accounts.sql?raw";
-import recipientDelivery from "../../database/migrations/0006_recipient_delivery.sql?raw";
 import carts from "../../database/migrations/0007_carts.sql?raw";
 import shippingRates from "../../database/migrations/0008_shipping_rates.sql?raw";
 
@@ -34,7 +33,6 @@ function createDatabase(): CatalogDatabase {
   nativeDatabase.exec(productionTables);
   nativeDatabase.exec(settings);
   nativeDatabase.exec(buyerAccounts);
-  nativeDatabase.exec(recipientDelivery);
   nativeDatabase.exec(carts);
   nativeDatabase.exec(shippingRates);
   const orderColumns = nativeDatabase.prepare("PRAGMA table_info(orders)").all() as Array<{ name: string }>;
