@@ -109,8 +109,8 @@ function preparePngForPdf(png: Buffer) {
   return { width, height, data: deflateSync(rgb) };
 }
 
-function createReceiptPdf(order: { id: string; delivery_email: string; delivery_name: string; delivery_address: string; delivery_city: string; delivery_country: string; subtotal: number; shipping: number; total: number; placed_at: string; payment_reference: string | null }, items: Array<{ product_name: string; size: number; quantity: number; unit_price: number }>, logo: Buffer) {
-  const image = preparePngForPdf(logo);
+function createReceiptPdf(order: { id: string; delivery_email: string; delivery_name: string; delivery_address: string; delivery_city: string; delivery_country: string; subtotal: number; shipping: number; total: number; placed_at: string; payment_reference: string | null }, items: Array<{ product_name: string; size: number; quantity: number; unit_price: number }>, logo?: Buffer) {
+  const image = logo ? preparePngForPdf(logo) : undefined;
   const money = (amount: number) => `GHS ${amount.toFixed(2)}`;
   const escape = (value: string) => value.replace(/[\\()]/g, (character) => `\\${character}`).replace(/[^\x20-\x7E]/g, "?");
   const text = (value: string, x: number, y: number, size = 10, font = "F1") => `BT /${font} ${size} Tf ${x} ${y} Td (${escape(value)}) Tj ET`;
@@ -122,8 +122,7 @@ function createReceiptPdf(order: { id: string; delivery_email: string; delivery_
   const content = [
     "q 0.98 0.72 0.12 rg 40 650 532 100 re f Q",
     "q 1 1 1 rg 40 40 532 590 re f Q",
-    "q 1 1 1 rg 55 690 80 80 re f Q",
-    "q 78 0 0 78 56 691 cm /Logo Do Q",
+    ...(image ? ["q 1 1 1 rg 55 690 80 80 re f Q", "q 78 0 0 78 56 691 cm /Logo Do Q"] : []),
     "0 0 0 rg",
     text("BIG PEE KICKS", 155, 731, 20, "F2"),
     text("OFFICIAL SALES RECEIPT", 155, 708, 9, "F2"),
@@ -149,11 +148,11 @@ function createReceiptPdf(order: { id: string; delivery_email: string; delivery_
   const objects: Buffer[] = [
     Buffer.from("<</Type /Catalog /Pages 2 0 R>>"),
     Buffer.from("<</Type /Pages /Kids [3 0 R] /Count 1>>"),
-    Buffer.from("<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> /XObject << /Logo 7 0 R >> >> >>"),
+    Buffer.from(`<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >>${image ? " /XObject << /Logo 7 0 R >>" : ""} >> >>`),
     Buffer.from(`<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`),
     Buffer.from("<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>"),
     Buffer.from("<</Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold>>"),
-    Buffer.concat([Buffer.from(`<</Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors 3 /BitsPerComponent 8 /Columns ${image.width} >> /Length ${image.data.length} >>\nstream\n`), image.data, Buffer.from("\nendstream")]),
+    ...(image ? [Buffer.concat([Buffer.from(`<</Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors 3 /BitsPerComponent 8 /Columns ${image.width} >> /Length ${image.data.length} >>\nstream\n`), image.data, Buffer.from("\nendstream")])] : []),
   ];
   const header = Buffer.from("%PDF-1.4\n%\xFF\xFF\xFF\xFF\n");
   const body: Buffer[] = [header];
@@ -267,7 +266,7 @@ export default {
 
         const orderRecord = order.results[0];
         const items = await database.prepare("SELECT product_name, size, quantity, unit_price FROM order_items WHERE order_id = ? ORDER BY id").bind(orderId).all<{ product_name: string; size: number; quantity: number; unit_price: number }>();
-        const logo = await readFile(join(process.cwd(), "logo", "logo.png"));
+        const logo = await readFile(join(process.cwd(), "logo", "logo.png")).catch(() => undefined);
         const pdf = createReceiptPdf(orderRecord, items.results, logo);
         return new Response(pdf, { headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="${orderId}-receipt.pdf"` } });
       }
