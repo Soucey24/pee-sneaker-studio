@@ -138,7 +138,7 @@ At Big Pee, footwear is more than just something you wear. It’s part of your e
 
 From everyday essentials to standout pairs, Big Pee is here to help you step out looking good and feeling confident. Every pair has a purpose, every customer matters, and every purchase is a reflection of the standard we stand by.
 
-**Big Pee — Step In. Stand Out.**
+Big Pee Step In. Stand Out.
 
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4">
