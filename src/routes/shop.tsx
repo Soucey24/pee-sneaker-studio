@@ -84,7 +84,7 @@ function ShopPage() {
         {!filteredProducts.length && <p className="py-20 text-center text-muted-foreground">No pairs match those filters.</p>}
         </div>
       </main>
-      <SiteFooter />
+      
     </div>
   );
 }

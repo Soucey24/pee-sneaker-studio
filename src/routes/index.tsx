@@ -130,15 +130,21 @@ function Index() {
               Run by <span className="ember-text">Big Pee</span>
             </h2>
             <p className="mt-5 text-muted-foreground">
-              What started as one man trading pairs out of a duffel bag turned
-              into a shop with a reputation. Big Pee checks every stitch, every
-              box and every insole himself — if it wouldn't go on his feet, it
-              doesn't hit the shelf.
+             What started as a passion for quality footwear grew into a brand built on style, confidence, and trust. Big Pee Kicks was created with a simple vision: to make great footwear accessible to people who appreciate quality, comfort, and a look that speaks for itself.
+
+Every pair is carefully selected and inspected from the stitching and materials to the box and insole. Nothing makes it onto the shelf without meeting the standard. Whether it’s a fresh pair of sneakers, a classic shoe, or a comfortable pair of slippers, every product is chosen with the customer in mind.
+
+At Big Pee, footwear is more than just something you wear. It’s part of your everyday style, your confidence, and the way you show up. That’s why we’re committed to offering pieces that combine quality, comfort, and personality.
+
+From everyday essentials to standout pairs, Big Pee is here to help you step out looking good and feeling confident. Every pair has a purpose, every customer matters, and every purchase is a reflection of the standard we stand by.
+
+**Big Pee — Step In. Stand Out.**
+
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4">
               {[
                 ["12k+", "Pairs shipped"],
-                ["9 yrs", "In the game"],
+                ["2 yrs", "In the game"],
                 ["4.9", "Customer rating"],
               ].map(([n, l]) => (
                 <div key={l}>
@@ -151,7 +157,7 @@ function Index() {
 
           <div className="grid gap-4 sm:grid-cols-1">
             {[
-              [Truck, "Fast worldwide delivery", "2–5 days to most cities."],
+              [Truck, "Fast nationwide delivery", "2–5 days to most cities."],
               [ShieldCheck, "Legit-checked", "Every pair verified in-store."],
               [RefreshCw, "14-day swaps", "Wrong size? Easy exchange."],
             ].map(([Icon, title, copy], i) => {
