@@ -5,7 +5,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { nitro } from "nitro/vite";
 
 export default defineConfig(({ command }) => {
-  if (command === "build") process.env.NODE_ENV = "production";
+  if (command === "build") process.env["NODE_ENV"] = "production";
 
   return {
     plugins: [
@@ -26,9 +26,6 @@ export default defineConfig(({ command }) => {
     },
     ssr: {
       noExternal: ["@tanstack/react-start"],
-    },
-    esbuild: {
-      jsxDev: false,
     },
     build: {
       sourcemap: false,
